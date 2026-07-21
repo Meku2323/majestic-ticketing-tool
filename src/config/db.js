@@ -1,7 +1,22 @@
 import { PrismaClient } from '@prisma/client';
 
+// Explicitly construct the target database URL inside application runtime memory space
+// This completely protects the password string parameters from terminal or config parser strip bugs
+const dbUser = process.env.DB_USER || 'avnadmin';
+const dbPassword = process.env.DB_PASSWORD || 'AVNS_r5Mb3wnmk7upj2NjLaJ';
+const dbHost = process.env.DB_HOST || '://aivencloud.com';
+const dbPort = process.env.DB_PORT || '28015';
+const dbName = process.env.DB_NAME || 'defaultdb';
+
+const dynamicUrl = `mysql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}`;
+
 const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error', 'warn'],
+  datasources: {
+    db: {
+      url: dynamicUrl,
+    },
+  },
+  log: ['error', 'warn'],
 });
 
 export async function connectDatabase() {
