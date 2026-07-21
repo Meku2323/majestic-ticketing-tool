@@ -1,26 +1,19 @@
-import jwt from 'jsonwebtoken';
+// Ensure 'export' is explicitly defined at the beginning of the function declaration
+export function errorHandler(err, req, res, next) {
+  console.error('💥 An unhandled error exception occurred within the routing architecture:', err.stack);
 
-export function authenticateJWT(req, res, next) {
-  const authHeader = req.headers.authorization;
-  const lang = req.headers['accept-language'] === 'am' ? 'am' : 'en';
+  let statusCode = 500;
+  let message = 'Internal Server Error: A severe system operation fault occurred.';
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({
-      error: lang === 'am' ? 'ያልተፈቀደ መዳረሻ፡ እባክዎ አስቀድመው ይግቡ።' : 'Access Denied: Missing authorization context token credentials.'
-    });
+  if (err.name === 'ValidationError' || err.code === 'P2002') {
+    statusCode = 400;
+    message = 'Data persistence conflict or malformed parameters array received.';
   }
 
-  const token = authHeader.split(' ')[1];
-
-  try {
-    const verifiedPayload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret_key_2026_ticketing');
-    
-    // Bind current user metadata globally across downstream pipeline environments
-    req.user = verifiedPayload;
-    next();
-  } catch (error) {
-    return res.status(403).json({
-      error: lang === 'am' ? 'የመዳረሻ ፈቃድዎ ጊዜ አልፎበታል ወይም ልክ ያልሆነ ነው።' : 'Session Expired or Invalid Identity Token verification signature.'
-    });
-  }
+  res.status(statusCode).json({
+    status: 'error',
+    statusCode,
+    message: err.message || message,
+    ...(process.env.NODE_ENV === 'development' && { trace: err.stack })
+  });
 }
