@@ -1,7 +1,7 @@
 
 datasource db {
   provider = "mysql"
-  url      = "mysql://avnadmin:blank@localhost:3306/defaultdb"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
