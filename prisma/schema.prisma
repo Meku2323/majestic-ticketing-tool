@@ -1,0 +1,148 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum TicketType {
+  bug
+  feature_request
+}
+
+enum TicketStatus {
+  new
+  triaged
+  in_progress
+  blocked
+  done
+  wont_fix
+  duplicate
+}
+
+enum TicketPriority {
+  low
+  medium
+  high
+  critical
+}
+
+enum TicketSeverity {
+  minor
+  major
+  critical
+}
+
+enum AttachmentSource {
+  upload
+  captured_screenshot
+}
+
+enum UserRole {
+  admin
+  triager
+}
+
+model System {
+  id             Int      @id @default(autoincrement())
+  name           String   @db.VarChar(191)
+  api_key        String   @unique @db.VarChar(191)
+  allowed_origin String   @db.VarChar(191)
+  created_at     DateTime @default(now()) @db.DateTime(3)
+  tickets        Ticket[]
+
+  @@index([api_key])
+  @@map("systems")
+}
+
+model Ticket {
+  id              Int             @id @default(autoincrement())
+  system_id       Int
+  type            TicketType
+  title           String          @db.VarChar(255)
+  description     String          @db.Text
+  status          TicketStatus    @default(new)
+  priority        TicketPriority?
+  severity        TicketSeverity?
+  reporter_name   String?         @db.VarChar(255)
+  reporter_email  String?         @db.VarChar(255)
+  reporter_role   String?         @db.VarChar(255)
+  page_url        String          @db.VarChar(2048)
+  browser_info    String          @db.VarChar(512)
+  assigned_to     Int?
+  duplicate_of    Int?
+  created_at      DateTime        @default(now()) @db.DateTime(3)
+  updated_at      DateTime        @updatedAt @db.DateTime(3)
+
+  system          System          @relation(fields: [system_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  assignee        User?           @relation(fields: [assigned_to], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  canonicalTicket Ticket?         @relation("TicketDuplicates", fields: [duplicate_of], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  
+  duplicates      Ticket[]        @relation("TicketDuplicates")
+  attachments     Attachment[]
+  comments        Comment[]
+  votes           Vote[]
+
+  @@index([system_id])
+  @@index([status])
+  @@index([priority])
+  @@index([assigned_to])
+  @@map("tickets")
+}
+
+model Attachment {
+  id          Int              @id @default(autoincrement())
+  ticket_id   Int
+  file_path   String           @db.VarChar(512)
+  file_type   String           @db.VarChar(100)
+  source      AttachmentSource
+  uploaded_at DateTime         @default(now()) @db.DateTime(3)
+
+  ticket      Ticket           @relation(fields: [ticket_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([ticket_id])
+  @@map("ticket_attachments")
+}
+
+model Comment {
+  id          Int      @id @default(autoincrement())
+  ticket_id   Int
+  author_id   Int?
+  body        String   @db.Text
+  is_internal Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.DateTime(3)
+
+  ticket      Ticket   @relation(fields: [ticket_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  author      User?    @relation(fields: [author_id], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([ticket_id])
+  @@index([author_id])
+  @@map("ticket_comments")
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  name          String    @db.VarChar(191)
+  email         String    @unique @db.VarChar(191)
+  password_hash String    @db.VarChar(191)
+  role          UserRole  @default(triager)
+  
+  tickets       Ticket[]
+  comments      Comment[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model Vote {
+  id               Int      @id @default(autoincrement())
+  ticket_id        Int
+  voter_identifier String   @db.VarChar(191)
+
+  ticket           Ticket   @relation(fields: [ticket_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([ticket_id, voter_identifier])
+  @@map("votes")
+}
